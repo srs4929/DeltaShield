@@ -392,3 +392,189 @@ def add_all_ui(m: folium.Map,
         ),
     ]:
         m.get_root().html.add_child(folium.Element(html))
+
+
+# -----------------------
+# Prediction panel + legend
+# -----------------------
+def _prediction_panel(bangladesh, model) -> str:
+    """Top-5 predicted risk districts panel."""
+    from predictor import get_feature_importance
+
+    top5 = bangladesh.sort_values("risk_probability", ascending=False)[
+        ["NAME_2", "predicted_risk_tier", "risk_probability", "top_risk_factor"]
+    ].head(5)
+
+    rows = ""
+    for _, row in top5.iterrows():
+        bg, txt, label = tier_badge(row["predicted_risk_tier"])
+        prob_pct = f"{row['risk_probability']*100:.0f}%"
+        rows += panel_row(
+            row["NAME_2"],
+            f"Confidence: {prob_pct} | Driver: {row['top_risk_factor']}",
+            bg, txt,
+            f"{label} ({prob_pct})",
+        )
+
+    # Feature importance bar (text only, compact)
+    fi = get_feature_importance(model).head(4)
+    fi_html = "<div style='margin-top:8px;font-size:11px;color:#555;'><b>Top drivers (global):</b><br>"
+    for _, r in fi.iterrows():
+        bar_w = int(r["importance_pct"] * 1.4)  # scale to ~140px max
+        fi_html += (
+            f"<div style='display:flex;align-items:center;gap:6px;margin:3px 0;'>"
+            f"<span style='width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{r['feature']}</span>"
+            f"<div style='width:{bar_w}px;height:6px;background:#b71c1c;border-radius:3px;'></div>"
+            f"<span>{r['importance_pct']}%</span></div>"
+        )
+    fi_html += "</div>"
+
+    return make_panel(
+        "top5-prediction-panel", "#1b5e20", "🔮",
+        "Top 5 Predicted Risk",
+        "Next season forecast",
+        rows + fi_html,
+    )
+
+
+def _prediction_legend() -> str:
+    return make_legend(
+        "prediction-legend", "Predicted risk", "Dashed border = forecast",
+        [
+            ("#4a0000", "Critical — tier 4"),
+            ("#b71c1c", "High — tier 3"),
+            ("#e65100", "Moderate — tier 2"),
+            ("#f9a825", "Low — tier 1"),
+        ],
+    )
+
+
+def add_prediction_ui(m: folium.Map, bangladesh, pred_fg, model,
+                       existing_toggle_html: str = None):
+    """
+    Attach prediction panel and legend to the map.
+    Also patches the radio toggle to include a 6th 'Prediction' button.
+
+    Call this AFTER add_all_ui() so the toggle patch appends cleanly.
+
+    Args:
+        m:           Folium map.
+        bangladesh:  GeoDataFrame with prediction columns.
+        pred_fg:     FeatureGroup returned by add_prediction_layer().
+        model:       Trained RandomForestClassifier (for feature importances).
+    """
+    import folium as _folium
+
+    for html in [
+        _prediction_panel(bangladesh, model),
+        _prediction_legend(),
+    ]:
+        m.get_root().html.add_child(_folium.Element(html))
+
+    # Inject JS to wire the prediction layer into the existing toggle system
+    pred_var = pred_fg.get_name()
+    patch_js = f"""
+<script>
+(function() {{
+    var PRED_VAR = "{pred_var}";
+
+    // Add Prediction radio button to the toggle bar
+    var bar = document.querySelector('div[style*="transform:translateX(-50%)"]');
+    if (bar) {{
+        var sep  = document.createElement('span');
+        sep.style.color = '#ddd';
+        sep.textContent = '|';
+
+        var lbl  = document.createElement('label');
+        lbl.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;';
+        lbl.innerHTML = '<input type="radio" name="mapMode" id="predMode" '
+            + 'style="accent-color:#1b5e20;width:14px;height:14px;">'
+            + '<span id="lbl-pred" style="color:#999;">Prediction</span>';
+
+        bar.appendChild(sep);
+        bar.appendChild(lbl);
+    }}
+
+    function getMap() {{
+        for (var k in window) {{
+            try {{
+                if (window[k] && window[k]._leaflet_id !== undefined &&
+                    typeof window[k].addLayer === 'function') return window[k];
+            }} catch(e) {{}}
+        }}
+        return null;
+    }}
+
+    function setLayer(mapObj, varName, show) {{
+        var layer = window[varName];
+        if (!layer || !mapObj) return;
+        if (show  && !mapObj.hasLayer(layer)) mapObj.addLayer(layer);
+        if (!show &&  mapObj.hasLayer(layer)) mapObj.removeLayer(layer);
+    }}
+
+    var predInput = document.getElementById('predMode');
+    if (predInput) {{
+        predInput.addEventListener('change', function() {{
+            if (!this.checked) return;
+            var mapObj = getMap();
+
+            // Hide all other layers
+            ['flood_var','pop_var','comb_dist_var','comb_thana_var',
+             'final_dist_var','final_thana_var',
+             'hosp_var','clinic_var','school_var'].forEach(function(v) {{
+                if (window[v]) setLayer(mapObj, v, false);
+             }});
+
+            // Show prediction layer
+            setLayer(mapObj, PRED_VAR, true);
+
+            // Hide all panels/legends then show prediction ones
+            var allIds = ['top5-flood-panel','flood-legend',
+                          'top5-pop-panel','pop-legend',
+                          'top5-combined-panel','combined-legend',
+                          'top5-final-panel','final-legend'];
+            allIds.forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            }});
+            ['top5-prediction-panel','prediction-legend'].forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el) el.style.display = 'block';
+            }});
+
+            // Update label styles
+            var cfg = {{
+                normal:'lbl-normal', flood:'lbl-flood', pop:'lbl-pop',
+                combined:'lbl-combined', final:'lbl-final', pred:'lbl-pred'
+            }};
+            var colors = {{
+                normal:'#1a73e8', flood:'#e53935', pop:'#08306b',
+                combined:'#4a0000', final:'#1b5e20', pred:'#1b5e20'
+            }};
+            Object.keys(cfg).forEach(function(k) {{
+                var el = document.getElementById(cfg[k]);
+                if (!el) return;
+                el.style.color      = (k==='pred') ? colors[k] : '#999';
+                el.style.fontWeight = (k==='pred') ? '600' : '400';
+            }});
+        }});
+    }}
+
+    // Also hide prediction layer when other modes are selected
+    var origApply = window.applyMode;
+    if (origApply) {{
+        window.applyMode = function(mode) {{
+            origApply(mode);
+            setLayer(getMap(), PRED_VAR, false);
+            ['top5-prediction-panel','prediction-legend'].forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            }});
+            var lbl = document.getElementById('lbl-pred');
+            if (lbl) {{ lbl.style.color = '#999'; lbl.style.fontWeight = '400'; }}
+        }};
+    }}
+}})();
+</script>"""
+
+    m.get_root().html.add_child(_folium.Element(patch_js))

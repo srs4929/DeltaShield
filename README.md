@@ -1,13 +1,8 @@
 # DeltaShield: Bangladesh Disaster Risk Assessment & Visualization
 
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
-![Folium](https://img.shields.io/badge/folium-0.20.0-green.svg)
-![GeoPandas](https://img.shields.io/badge/geopandas-1.1.3-green.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-
 ## Overview
 
-**DeltaShield** is an advanced geospatial analytics platform designed to assess and visualize disaster risk across Bangladesh's administrative divisions. The system integrates multi-dimensional risk factors—flood hazards, population density, and critical infrastructure—to generate comprehensive risk scores and produce interactive web-based maps for disaster preparedness and response planning.
+**DeltaShield** is an geospatial analytics platform designed to assess and visualize disaster risk across Bangladesh's administrative divisions. The system integrates multi-dimensional risk factors—flood hazards, population density, and critical infrastructure—to generate comprehensive risk scores and produce interactive web-based maps for disaster preparedness and response planning.
 
 ### Key Features
 
@@ -19,7 +14,15 @@
 - **Data-Driven Insights**: UI panels displaying aggregated statistics and risk breakdowns by category
 
 ---
+### Map Layers Preview
 
+| Flood | Population |
+|-------|------------|
+| <img width="1358" height="631" alt="Image" src="https://github.com/user-attachments/assets/d247e9ec-eb08-48b5-bf74-21213dfaa320" /> |<img width="1366" height="646" alt="Image" src="https://github.com/user-attachments/assets/9002b18b-2ec6-4a7a-98dd-03b4c984678e" /> |
+
+| Flood + Population | Flood + Population + Infrastructure |
+|-------------------|-----------------------------------|
+| <img width="1366" height="645" alt="Image" src="https://github.com/user-attachments/assets/f236f61b-57bd-415e-be3a-1cac0e407d0e" /> | <img width="1358" height="657" alt="Image" src="https://github.com/user-attachments/assets/59c212e1-3bbc-44f1-a37d-7896df0f7ab3" /> |
 ## Project Structure
 
 ```
@@ -42,9 +45,10 @@ DeltaShield/
 │   ├── data_loader.py                 # Data loading & preprocessing
 │   ├── risk_scorer.py                 # Risk calculation & scoring logic
 │   ├── map_builder.py                 # Folium map construction & layer management
+│   ├── predictor.py                   # Machine learning prediction pipeline (training & inference)
 │   ├── helpers.py                     # Utility functions (normalization, styling)
 │   ├── ui_panels.py                   # UI legend and info panel generation
-│   └── __pycache__/                   # Python cache (auto-generated)
+│   
 ├── scripts/                           # Standalone utility scripts
 │   ├── openstreet_map_check.py        # Validate OSM data quality
 │   ├── population.py                  # Population data analysis
@@ -99,12 +103,6 @@ Execute the main application from the `src/` directory:
 cd src
 python main.py
 ```
-
-**Expected Output**:
-- Console logging of data loading, processing, and score computation stages
-- Generation of `output/disaster_map.html` — an interactive web map
-- Completion status message with file path
-
 ### Opening the Generated Map
 
 1. Navigate to `output/disaster_map.html` in your project directory
@@ -238,6 +236,32 @@ Districts are classified into four risk tiers based on percentile distribution:
 
 ---
 
+### `predictor.py` — Machine Learning Risk Prediction
+**Purpose**: Train and deploy a predictive classifier for district-level vulnerability assessment.
+
+**Key Functions**:
+- `add_spatial_features()` → Computes `neighbor_avg_floodcat` (mean flood category of adjacent districts)
+- `add_vulnerability_target()` → Generates binary `compound_risk` label using weighted 3-factor rule (flood × 2 points + pop × 1 + infra × 1; label = 1 if score ≥ 2)
+- `build_features()` → Extracts feature matrix from enriched dataset; NaN-fills with median
+- `evaluate()` → Runs Stratified 5-fold and Leave-One-Out cross-validation; reports weighted F1
+- `train_model()` → Trains Random Forest and Gradient Boosting candidates, selects winner by LOO score, calibrates probabilities via Platt scaling, saves `output/flood_risk_model.pkl`, reports permutation importances
+- `load_model()` → Loads saved model with feature schema validation; auto-deletes stale models
+- `predict()` → Applies trained model to annotate districts with `predicted_risk_tier`, `risk_probability` (calibrated P(vulnerable)), and `top_risk_factor` (most influential feature per district)
+- `get_feature_importance()` → Returns feature importances as DataFrame with permutation or impurity scores
+
+**Model Features** (7 total):
+- `avg_floodcat`: Average flood category per district
+- `neighbor_avg_floodcat`: Spatial adjacency context
+- `T_TL`: Raw population count
+- `hosp_count`, `clinic_count`, `school_count`: Infrastructure facility counts
+- `infra_per_100k`: Infrastructure density per 100k population
+
+**Calibration Method**: Logistic Regression (Platt scaling) on out-of-fold probability scores from cross-validation.
+
+**Output Artifact**: `output/flood_risk_model.pkl` (serialized CalibratedModel wrapper with base estimator + Platt scaler).
+
+---
+
 ### `map_builder.py` — Geospatial Visualization
 **Purpose**: Constructs interactive Folium map with multiple layers.
 
@@ -293,134 +317,6 @@ Focuses on educational institution locations and coverage analysis.
 
 #### `mismatches.py`
 Identifies and reconciles data inconsistencies between datasets.
-
----
-
-## Configuration Guide
-
-### Adjusting Risk Weights
-
-Edit `config.py` to modify the weighting scheme:
-
-```python
-SCORE_WEIGHTS = {
-    "combined": {"flood": 0.70, "pop": 0.30},
-    "final":    {"flood": 0.50, "pop": 0.30, "infra": 0.20},  # Example adjustment
-}
-```
-
-**Impact**: Changes will be reflected in the next map generation.
-
----
-
-### Customizing Colors
-
-Modify `TIER_COLORS` or layer-specific color mappings in `config.py`:
-
-```python
-TIER_COLORS = {
-    4: "#8b0000",  # Crimson red
-    3: "#ff4500",  # Orange-red
-    2: "#ffa500",  # Orange
-    1: "#ffff00",  # Yellow
-}
-```
-
----
-
-### Changing Map Center & Initial Zoom
-
-```python
-MAP_CENTER = [23.7, 90.4]      # [latitude, longitude]
-MAP_ZOOM_START = 7              # Initial zoom level
-MAP_MIN_ZOOM = 7                # Minimum allowed zoom
-MAP_TILES = "cartodbpositron"   # Basemap provider
-```
-
----
-
-## Dependencies & Requirements
-
-All project dependencies are pinned in `requirements.txt`:
-
-```
-folium==0.20.0           # Interactive mapping
-geopandas==1.1.3         # Geospatial data operations
-pandas==3.0.1            # Tabular data manipulation
-shapely==2.1.2           # Geometric operations
-pyproj==3.7.2            # Coordinate system transformations
-```
-
-**Install**: `pip install -r requirements.txt`
-
----
-
-## Output & Deliverables
-
-### Primary Output: `disaster_map.html`
-
-An interactive web map with the following features:
-
-- **Responsive Layout**: Works on desktop and tablet devices
-- **Layer Controls**: Toggle between different risk visualization modes
-- **Search Functionality**: Find districts by name
-- **Hover/Click Information**: Display detailed metrics for each region
-- **Statistics Sidebar**: Summary aggregations and risk breakdowns
-- **Print-Ready**: Can be screenshot or saved as PDF via browser
-
-### File Size
-Typically 5–15 MB depending on data complexity.
-
-### Browser Compatibility
-- Chrome 90+
-- Firefox 88+
-- Edge 90+
-- Safari 14+
-
----
-
-## Troubleshooting
-
-### Issue: Missing data files
-
-**Error**: `FileNotFoundError: data/bangladesh_district.json not found`
-
-**Solution**: Ensure all files in the `data/` directory exist. Check paths in `config.py`.
-
----
-
-### Issue: Coordinate system mismatch
-
-**Error**: Features not displaying correctly on the map
-
-**Solution**: Verify that all shapefiles use EPSG:4326 (WGS84) projection. Use QGIS or `geopandas.GeoDataFrame.to_crs()` to reproject if needed.
-
----
-
-### Issue: Out of memory with large datasets
-
-**Error**: `MemoryError` during processing
-
-**Solution**: 
-1. Simplify geometries using `simplify()` in GeoPandas
-2. Reduce marker clustering radius in `map_builder.py`
-3. Increase system RAM or use a more powerful machine
-
----
-
-### Issue: Map not rendering in browser
-
-**Solution**:
-1. Ensure JavaScript is enabled in your browser
-2. Check browser console for errors (F12 → Console tab)
-3. Try a different browser or clear cache (Ctrl+Shift+Delete)
-4. Verify the HTML file path is correct
-
----
-**Optimization Tips**:
-- Simplify flood geometries if processing is slow
-- Use marker clustering in `map_builder.py` for dense infrastructure datasets
-- Consider spatial indexing (R-tree) for very large datasets (>100K features)
 
 ---
 
