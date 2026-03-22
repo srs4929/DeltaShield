@@ -2,7 +2,7 @@
 
 ## Overview
 
-**DeltaShield** is an geospatial analytics platform designed to assess and visualize disaster risk across Bangladesh's administrative divisions. The system integrates multi-dimensional risk factors—flood hazards, population density, and critical infrastructure—to generate comprehensive risk scores and produce interactive web-based maps for disaster preparedness and response planning.
+**DeltaShield** is a geospatial platform that helps visualize, assess, and predict disaster risk across Bangladesh. It combines flood hazards, population data, and critical infrastructure (hospitals, clinics, schools) to calculate risk scores for districts and thanas. Users can explore interactive maps, see which areas are most at risk, and make informed decisions to prepare for disasters. DeltaShield also uses machine learning to predict which districts may face problems in the future, helping authorities and planners take action before disasters happen.
 
 ### Key Features
 
@@ -10,6 +10,7 @@
 - **Multi-Factor Risk Assessment**: Combines flood hazard, population exposure, and infrastructure vulnerability metrics
 - **Infrastructure Awareness**: Identifies and maps critical facilities (hospitals, clinics, schools) to assess resource accessibility
 - **Spatial Analytics**: Employs advanced geospatial operations (spatial joins, choropleth classification) for risk quantification
+- **Predictive Risk Analysis**: Uses machine learning to forecast district-level vulnerability, helping authorities anticipate future impacts.
 - **Customizable Visualization**: Tiered risk colorization with configurable thresholds and layer controls
 - **Data-Driven Insights**: UI panels displaying aggregated statistics and risk breakdowns by category
 
@@ -45,7 +46,7 @@ DeltaShield/
 │   ├── data_loader.py                 # Data loading & preprocessing
 │   ├── risk_scorer.py                 # Risk calculation & scoring logic
 │   ├── map_builder.py                 # Folium map construction & layer management
-│   ├── predictor.py                   # Machine learning prediction pipeline (training & inference)
+│   ├── predictor.py                   # Machine learning prediction pipeline
 │   ├── helpers.py                     # Utility functions (normalization, styling)
 │   ├── ui_panels.py                   # UI legend and info panel generation
 │   
@@ -161,7 +162,29 @@ Districts are classified into four risk tiers based on percentile distribution:
 | 1 | **Low** | Yellow (#ffc107) | Bottom 25% |
 
 ---
+### Machine Learning-Based Prediction
 
+In addition to rule-based risk scoring, DeltaShield uses ensemble machine learning models (Random Forest and Gradient Boosting) to identify district-level vulnerability. The system automatically selects the best-performing model based on cross-validation results.
+
+The model uses the following key factors:
+
+- Average flood category  
+- Neighboring districts' flood risk (spatial context)  
+- Total population  
+- Infrastructure counts (hospitals, clinics, schools)  
+- Infrastructure density per 100,000 population  
+
+A district is classified as **compound-risk** when multiple risk factors are high at the same time — especially flood exposure, population pressure, and limited infrastructure. This ensures that flood risk remains a key driver of vulnerability.
+
+The model provides:
+
+- **Predicted risk tier** (compound-risk or lower-risk)  
+- **Risk probability** — likelihood of being high-risk (0.0–1.0)  
+- **Top risk factor** — the most important factor behind the prediction  
+
+The model also highlights the most influential factor for each district, improving transparency and helping users understand why a district is considered at risk. Model performance is evaluated using cross-validation methods to ensure reliable results, especially for small datasets like Bangladesh’s 64 districts. Probability outputs are adjusted to better reflect real-world likelihood, making the predictions more reliable.
+
+---
 ## Data Sources
 
 | Dataset | Source | Format | Description |
