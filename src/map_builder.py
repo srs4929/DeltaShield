@@ -343,6 +343,49 @@ def add_infra_markers(m: folium.Map,
     return hosp_fg, clinic_fg, school_fg
 
 
+# -----------------------
+# Prediction layer
+# -----------------------
+def add_prediction_layer(m: folium.Map, bangladesh) -> folium.FeatureGroup:
+    """
+    Add a district-level prediction choropleth layer.
+
+    Color encodes predicted_risk_tier (same palette as other risk layers).
+    Tooltip shows predicted tier, confidence probability, and top risk driver.
+
+    Returns:
+        The FeatureGroup.
+    """
+    fg = folium.FeatureGroup(name="Predicted Risk", show=False)
+    folium.GeoJson(
+        bangladesh,
+        style_function=lambda x: {
+            "fillColor": tier_color(x["properties"].get("predicted_risk_tier", 1)),
+            "color": "black",
+            "weight": 1.0,
+            "fillOpacity": 0.75,
+            "dashArray": "5,4",   # dashed border = prediction, not measured data
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=[
+                "NAME_2",
+                "predicted_risk_tier",
+                "risk_probability",
+                "top_risk_factor",
+            ],
+            aliases=[
+                "District:",
+                "Predicted tier:",
+                "High/critical probability:",
+                "Top risk driver:",
+            ],
+            localize=True,
+        ),
+    ).add_to(fg)
+    fg.add_to(m)
+    return fg
+
+
 def _station_alert_level(row: pd.Series) -> int:
     """Compute station-level alert from observed water and danger level."""
     wl = row.get("waterlevel")
