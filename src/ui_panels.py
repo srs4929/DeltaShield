@@ -5,7 +5,7 @@
 import pandas as pd
 import folium
 from helpers import tier_badge
-from config import FLOOD_LAYER_COLORS, POP_LAYER_COLORS
+from config import FLOOD_LAYER_COLORS, POP_LAYER_COLORS, WATERLEVEL_ALERT_COLORS, WATERLEVEL_ALERT
 
 
 # -----------------------
@@ -150,6 +150,63 @@ def _final_panel(bangladesh) -> str:
                       "70% Flood + 20% Pop + 10% Infrastructure", rows)
 
 
+def _water_panel(bangladesh) -> str:
+    needed = {"NAME_2", "water_alert_level", "max_exceedance_m", "station_count"}
+    if not needed.issubset(set(bangladesh.columns)):
+        rows = panel_row("No live alert data", "FFWC feed unavailable", "#9e9e9e", "#fff", "N/A")
+        return make_panel(
+            "top5-water-panel",
+            "#1565c0",
+            "🌊",
+            "Water Alerts (Rivers)",
+            "FFWC live gauge feed",
+            rows,
+        )
+
+    # Filter to only districts with at least one station, then sort by alert level + exceedance
+    with_stations = bangladesh[bangladesh["station_count"] > 0].copy()
+    
+    if with_stations.empty:
+        rows = panel_row("No stations detected", "All systems normal across Bangladesh", "#43a047", "#fff", "OK")
+        return make_panel(
+            "top5-water-panel",
+            "#1565c0",
+            "🌊",
+            "Water Alerts (Rivers)",
+            "FFWC observed gauge levels",
+            rows,
+        )
+
+    top5 = with_stations.sort_values(
+        ["water_alert_level", "max_exceedance_m", "station_count"],
+        ascending=[False, False, False],
+    )[["NAME_2", "water_alert_level", "max_exceedance_m", "station_count"]].head(5)
+
+    label_map = {2: "Warning", 1: "Watch", 0: "No Alert"}
+    rows = ""
+    for _, row in top5.iterrows():
+        level = int(row["water_alert_level"])
+        bg = WATERLEVEL_ALERT_COLORS.get(level, "#43a047")
+        txt = "#fff" if level >= 1 else "#111"
+        exceedance = float(row["max_exceedance_m"]) if pd.notna(row["max_exceedance_m"]) else 0.0
+        rows += panel_row(
+            row["NAME_2"],
+            f"Stations: {int(row['station_count'])} | Exceedance: {exceedance:+.2f} m",
+            bg,
+            txt,
+            label_map.get(level, "No Alert"),
+        )
+
+    return make_panel(
+        "top5-water-panel",
+        "#1565c0",
+        "🌊",
+        "Top 5 Water Alert Districts",
+        "API: FFWC observed gauge levels",
+        rows,
+    )
+
+
 # -----------------------
 # Legend builders
 # -----------------------
@@ -209,14 +266,29 @@ def _final_legend(fin_p25, fin_p50, fin_p75) -> str:
     )
 
 
+def _water_legend() -> str:
+    watch_buffer = float(WATERLEVEL_ALERT.get("watch_buffer_m", 0.5))
+    return make_legend(
+        "water-legend",
+        "Water Alerts",
+        "Based on gauge water level vs danger level",
+        [
+            (WATERLEVEL_ALERT_COLORS[2], "Warning (WL ≥ Danger Level)"),
+            (WATERLEVEL_ALERT_COLORS[1], f"Watch (within {watch_buffer:.1f}m below danger)"),
+            (WATERLEVEL_ALERT_COLORS[0], "No Alert"),
+        ],
+    )
+
+
 # -----------------------
 # Radio toggle JS block
 # -----------------------
 def radio_toggle_js(flood_var, pop_var, comb_dist_var, comb_thana_var,
                      final_dist_var, final_thana_var,
-                     hosp_var, clinic_var, school_var) -> str:
+                     hosp_var, clinic_var, school_var,
+                     river_var, station_var) -> str:
     """
-    Generate the 5-way radio toggle bar and its JavaScript controller.
+    Generate the 6-way radio toggle bar and its JavaScript controller.
 
     Args:
         *_var: Folium layer variable names returned by fg.get_name().
@@ -255,6 +327,12 @@ def radio_toggle_js(flood_var, pop_var, comb_dist_var, comb_thana_var,
                style="accent-color:#1b5e20;width:14px;height:14px;">
         <span id="lbl-final" style="color:#999;">Final Risk</span>
     </label>
+    <span style="color:#ddd;">|</span>
+    <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+        <input type="radio" name="mapMode" id="waterMode"
+               style="accent-color:#1565c0;width:14px;height:14px;">
+        <span id="lbl-water" style="color:#999;">Water Alerts</span>
+    </label>
 </div>
 
 <script>
@@ -267,6 +345,8 @@ var FINAL_THANA_VAR    = "{final_thana_var}";
 var HOSP_VAR           = "{hosp_var}";
 var CLINIC_VAR         = "{clinic_var}";
 var SCHOOL_VAR         = "{school_var}";
+var RIVER_VAR          = "{river_var}";
+var STATION_VAR        = "{station_var}";
 
 function getMap() {{
     for (var k in window) {{
@@ -298,11 +378,14 @@ function applyMode(mode) {{
     setLayer(mapObj, HOSP_VAR,        mode==='final');
     setLayer(mapObj, CLINIC_VAR,      mode==='final');
     setLayer(mapObj, SCHOOL_VAR,      mode==='final');
+    setLayer(mapObj, RIVER_VAR,       mode==='water');
+    setLayer(mapObj, STATION_VAR,     mode==='water');
 
     var allIds = ['top5-flood-panel','flood-legend',
                   'top5-pop-panel','pop-legend',
                   'top5-combined-panel','combined-legend',
-                  'top5-final-panel','final-legend'];
+                  'top5-final-panel','final-legend',
+                  'top5-water-panel','water-legend'];
     allIds.forEach(function(id) {{
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -312,7 +395,8 @@ function applyMode(mode) {{
         flood:    ['top5-flood-panel',    'flood-legend'],
         pop:      ['top5-pop-panel',      'pop-legend'],
         combined: ['top5-combined-panel', 'combined-legend'],
-        final:    ['top5-final-panel',    'final-legend']
+        final:    ['top5-final-panel',    'final-legend'],
+        water:    ['top5-water-panel',    'water-legend']
     }};
     if (showIds[mode]) {{
         showIds[mode].forEach(function(id) {{
@@ -326,7 +410,8 @@ function applyMode(mode) {{
         flood:    {{id:'lbl-flood',    color:'#e53935'}},
         pop:      {{id:'lbl-pop',      color:'#08306b'}},
         combined: {{id:'lbl-combined', color:'#4a0000'}},
-        final:    {{id:'lbl-final',    color:'#1b5e20'}}
+        final:    {{id:'lbl-final',    color:'#1b5e20'}},
+        water:    {{id:'lbl-water',    color:'#1565c0'}}
     }};
     Object.keys(cfg).forEach(function(k) {{
         var el = document.getElementById(cfg[k].id);
@@ -346,6 +431,8 @@ document.getElementById('combinedMode').addEventListener('change',
     function() {{ if(this.checked) applyMode('combined'); }});
 document.getElementById('finalMode').addEventListener('change',
     function() {{ if(this.checked) applyMode('final'); }});
+document.getElementById('waterMode').addEventListener('change',
+    function() {{ if(this.checked) applyMode('water'); }});
 </script>"""
 
 
@@ -358,6 +445,7 @@ def add_all_ui(m: folium.Map,
                comb_dist_fg, comb_thana_fg,
                final_dist_fg, final_thana_fg,
                hosp_fg, clinic_fg, school_fg,
+               river_fg, station_fg,
                comb_percentiles: tuple,
                fin_percentiles: tuple):
     """
@@ -375,10 +463,12 @@ def add_all_ui(m: folium.Map,
         _pop_panel(bangladesh),
         _combined_panel(bangladesh),
         _final_panel(bangladesh),
+        _water_panel(bangladesh),
         _flood_legend(),
         _pop_legend(bangladesh),
         _combined_legend(comb_p25, comb_p50, comb_p75),
         _final_legend(fin_p25, fin_p50, fin_p75),
+        _water_legend(),
         radio_toggle_js(
             flood_var       = flood_fg.get_name(),
             pop_var         = pop_fg.get_name(),
@@ -389,6 +479,8 @@ def add_all_ui(m: folium.Map,
             hosp_var        = hosp_fg.get_name(),
             clinic_var      = clinic_fg.get_name(),
             school_var      = school_fg.get_name(),
+            river_var       = river_fg.get_name(),
+            station_var     = station_fg.get_name(),
         ),
     ]:
         m.get_root().html.add_child(folium.Element(html))

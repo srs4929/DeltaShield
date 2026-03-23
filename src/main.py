@@ -7,13 +7,16 @@ from data_loader import (
     load_boundaries,
     load_population,
     load_flood_data,
+    load_rivers_data,
     load_infrastructure,
+    load_waterlevel_data,
     merge_population,
     slim_for_map,
 )
 from risk_scorer import (
     add_infrastructure_scores,
     add_flood_scores,
+    add_waterlevel_alerts,
     add_combined_scores,
     merge_scores_into_flood,
 )
@@ -25,6 +28,7 @@ from map_builder import (
     add_combined_layers,
     add_final_layers,
     add_infra_markers,
+    add_water_alert_layers,
 )
 from ui_panels import add_all_ui
 from config import DATA_PATHS
@@ -38,7 +42,9 @@ def main():
     boundaries          = load_boundaries()
     pop_df              = load_population()
     flood               = load_flood_data()
+    rivers              = load_rivers_data()
     hospitals, clinics, schools = load_infrastructure()
+    water_stations      = load_waterlevel_data()
 
     # ------------------------------------------------------------------
     # 2. Merge population into boundaries
@@ -51,6 +57,7 @@ def main():
     print("Computing scores...")
     bangladesh = add_infrastructure_scores(bangladesh, hospitals, clinics, schools)
     bangladesh = add_flood_scores(bangladesh, flood)
+    bangladesh = add_waterlevel_alerts(bangladesh, water_stations)
     bangladesh = add_combined_scores(bangladesh)
     flood      = merge_scores_into_flood(flood, bangladesh)
 
@@ -64,6 +71,7 @@ def main():
     bangladesh_map = slim_for_map(bangladesh, [
         "NAME_2", "NAME_2_clean", "T_TL", "M_TL", "F_TL",
         "avg_floodcat", "hosp_count", "clinic_count", "school_count",
+        "station_count", "max_exceedance_m", "water_alert_level", "water_alert_label",
         "combined_score", "risk_tier", "final_score", "final_risk_tier",
     ])
     flood_map = slim_for_map(flood, [
@@ -83,6 +91,7 @@ def main():
     comb_dist_fg, comb_thana_fg   = add_combined_layers(m, bangladesh_map, flood_map)
     final_dist_fg, final_thana_fg = add_final_layers(m, bangladesh_map, flood_map)
     hosp_fg, clinic_fg, school_fg = add_infra_markers(m, hospitals, clinics, schools)
+    river_fg, station_fg = add_water_alert_layers(m, rivers, water_stations)
 
     folium.LayerControl(collapsed=False).add_to(m)
 
@@ -102,6 +111,8 @@ def main():
         hosp_fg      = hosp_fg,
         clinic_fg    = clinic_fg,
         school_fg    = school_fg,
+        river_fg     = river_fg,
+        station_fg   = station_fg,
         comb_percentiles = comb_percentiles,
         fin_percentiles  = fin_percentiles,
     )

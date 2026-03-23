@@ -5,7 +5,7 @@
 import geopandas as gpd
 import pandas as pd
 from helpers import normalize, percentile_tier, to_gdf
-from config import SCORE_WEIGHTS
+from config import SCORE_WEIGHTS, WATERLEVEL_ALERT
 
 
 # -----------------------
@@ -170,3 +170,77 @@ def merge_scores_into_flood(flood: gpd.GeoDataFrame,
     flood["risk_tier"]       = flood["risk_tier"].fillna(1)
     flood["final_risk_tier"] = flood["final_risk_tier"].fillna(1)
     return flood
+
+
+def add_waterlevel_alerts(bangladesh: gpd.GeoDataFrame,
+                          stations: pd.DataFrame) -> gpd.GeoDataFrame:
+    """
+    Derive district-level water level alerts from FFWC station observations.
+
+    Alert logic:
+      - Warning: any station waterlevel >= dangerlevel
+      - Watch:   max(waterlevel - dangerlevel) >= -watch_buffer_m
+      - Else:    No Alert
+
+    Adds columns:
+      station_count, max_exceedance_m, water_alert_level, water_alert_label
+    """
+    watch_buffer = float(WATERLEVEL_ALERT["watch_buffer_m"])
+    warning_exceedance = float(WATERLEVEL_ALERT.get("warning_exceedance_m", 0.0))
+    level_none = int(WATERLEVEL_ALERT["none"])
+    level_watch = int(WATERLEVEL_ALERT["watch"])
+    level_warning = int(WATERLEVEL_ALERT["warning"])
+
+    bangladesh = bangladesh.copy()
+    bangladesh["station_count"] = 0
+    bangladesh["max_exceedance_m"] = float("-inf")
+    bangladesh["water_alert_level"] = level_none
+    bangladesh["water_alert_label"] = "No Alert"
+
+    if stations is None or stations.empty:
+        bangladesh["max_exceedance_m"] = bangladesh["max_exceedance_m"].replace(float("-inf"), 0.0)
+        return bangladesh
+
+    station_gdf = to_gdf(stations)
+    station_gdf["exceedance_m"] = station_gdf["waterlevel"] - station_gdf["dangerlevel"]
+
+    district_geom = bangladesh[["NAME_2_clean", "geometry"]].copy()
+    joined = gpd.sjoin(
+        station_gdf[["exceedance_m", "geometry"]],
+        district_geom,
+        how="left",
+        predicate="within",
+    )
+    joined = joined.dropna(subset=["NAME_2_clean"])
+
+    if joined.empty:
+        print("⚠ Warning: No stations spatially within districts (spatial join returned empty)")
+        bangladesh["max_exceedance_m"] = bangladesh["max_exceedance_m"].replace(float("-inf"), 0.0)
+        return bangladesh
+
+    print(f"✓ Spatial join found {len(joined)} station-to-district matches")
+    district_stats = (
+        joined.groupby("NAME_2_clean")["exceedance_m"]
+        .agg(station_count="size", max_exceedance_m="max")
+        .reset_index()
+    )
+
+    bangladesh = bangladesh.merge(district_stats, on="NAME_2_clean", how="left", suffixes=("", "_agg"))
+    bangladesh["station_count"] = bangladesh["station_count_agg"].fillna(bangladesh["station_count"]).fillna(0).astype(int)
+    bangladesh["max_exceedance_m"] = bangladesh["max_exceedance_m_agg"].fillna(bangladesh["max_exceedance_m"]) 
+
+    bangladesh = bangladesh.drop(columns=[c for c in ["station_count_agg", "max_exceedance_m_agg"] if c in bangladesh.columns])
+
+    bangladesh.loc[bangladesh["max_exceedance_m"] >= -watch_buffer, "water_alert_level"] = level_watch
+    bangladesh.loc[bangladesh["max_exceedance_m"] >= warning_exceedance, "water_alert_level"] = level_warning
+
+    label_map = {
+        level_none: "No Alert",
+        level_watch: "Watch",
+        level_warning: "Warning",
+    }
+    bangladesh["water_alert_label"] = bangladesh["water_alert_level"].map(label_map).fillna("No Alert")
+
+    bangladesh["max_exceedance_m"] = bangladesh["max_exceedance_m"].replace(float("-inf"), 0.0)
+
+    return bangladesh
