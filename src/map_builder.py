@@ -11,7 +11,7 @@ from helpers import tier_color
 from config import (
     MAP_CENTER, MAP_ZOOM_START, MAP_MIN_ZOOM, MAP_TILES,
     FLOOD_THRESHOLDS, FLOOD_LAYER_COLORS, POP_LAYER_COLORS,
-    INFRA_MARKER_COLORS,
+    INFRA_MARKER_COLORS, WATERLEVEL_ALERT_COLORS, WATERLEVEL_ALERT, WATERLEVEL_UI_COLORS,
 )
 
 
@@ -384,3 +384,150 @@ def add_prediction_layer(m: folium.Map, bangladesh) -> folium.FeatureGroup:
     ).add_to(fg)
     fg.add_to(m)
     return fg
+
+
+def _station_alert_level(row: pd.Series) -> int:
+    """Compute station-level alert from observed water and danger level."""
+    wl = row.get("waterlevel")
+    dl = row.get("dangerlevel")
+    warning_exceedance = float(WATERLEVEL_ALERT.get("warning_exceedance_m", 0.0))
+    if pd.isna(wl) or pd.isna(dl):
+        return int(WATERLEVEL_ALERT["none"])
+    if float(wl) >= float(dl) + warning_exceedance:
+        return int(WATERLEVEL_ALERT["warning"])
+    if float(wl) >= float(dl) - float(WATERLEVEL_ALERT["watch_buffer_m"]):
+        return int(WATERLEVEL_ALERT["watch"])
+    return int(WATERLEVEL_ALERT["none"])
+
+
+def add_water_alert_layers(m: folium.Map,
+                           rivers,
+                           stations: pd.DataFrame):
+    """
+    Add river polylines and gauge station markers for real-time water alerts.
+
+    River styling is linked to station status by river name when available.
+
+    Returns:
+        (river_fg, station_fg)
+    """
+    river_fg = folium.FeatureGroup(name="Rivers (Water Alert)", show=False)
+    station_fg = folium.FeatureGroup(name="Gauge Stations (Water Alert)", show=False)
+
+    stations_map = stations.copy() if stations is not None else pd.DataFrame()
+    if not stations_map.empty:
+        stations_map["station_alert_level"] = stations_map.apply(_station_alert_level, axis=1)
+        level_label = {
+            int(WATERLEVEL_ALERT["none"]): "No Alert",
+            int(WATERLEVEL_ALERT["watch"]): "Watch",
+            int(WATERLEVEL_ALERT["warning"]): "Warning",
+        }
+        stations_map["station_alert_label"] = stations_map["station_alert_level"].map(level_label).fillna("No Alert")
+        if "river" in stations_map.columns:
+            stations_map["river_clean"] = stations_map["river"].astype(str).str.strip().str.title()
+
+    if rivers is not None and len(rivers) > 0:
+        rivers_map = rivers.copy()
+        rivers_map["river_alert_level"] = int(WATERLEVEL_ALERT["none"])
+        rivers_map["river_alert_label"] = "No Alert"
+
+        if (
+            not stations_map.empty
+            and "river_name_clean" in rivers_map.columns
+            and "river_clean" in stations_map.columns
+        ):
+            river_alert = (
+                stations_map.groupby("river_clean")["station_alert_level"]
+                .max()
+                .reset_index()
+            )
+            river_alert.columns = ["river_name_clean", "river_alert_level"]
+            rivers_map = rivers_map.merge(river_alert, on="river_name_clean", how="left", suffixes=("", "_obs"))
+            rivers_map["river_alert_level"] = (
+                rivers_map["river_alert_level_obs"]
+                .fillna(rivers_map["river_alert_level"])
+                .fillna(int(WATERLEVEL_ALERT["none"]))
+                .astype(int)
+            )
+            rivers_map = rivers_map.drop(columns=[c for c in ["river_alert_level_obs"] if c in rivers_map.columns])
+
+        label_map = {
+            int(WATERLEVEL_ALERT["none"]): "No Alert",
+            int(WATERLEVEL_ALERT["watch"]): "Watch",
+            int(WATERLEVEL_ALERT["warning"]): "Warning",
+        }
+        rivers_map["river_alert_label"] = rivers_map["river_alert_level"].map(label_map).fillna("No Alert")
+
+        def river_style(feature):
+            level = int(feature["properties"].get("river_alert_level", WATERLEVEL_ALERT["none"]))
+            color = WATERLEVEL_ALERT_COLORS.get(level, WATERLEVEL_UI_COLORS["river_default"])
+            if level == int(WATERLEVEL_ALERT["none"]):
+                color = WATERLEVEL_UI_COLORS["river_default"]
+            return {
+                "color": color,
+                "weight": 2.5,
+                "opacity": 0.75,
+            }
+
+        tooltip_fields = [c for c in ["river_name_clean", "river_alert_label"] if c in rivers_map.columns]
+        tooltip_aliases = ["River:", "Status:"][:len(tooltip_fields)]
+
+        folium.GeoJson(
+            rivers_map,
+            style_function=river_style,
+            tooltip=folium.GeoJsonTooltip(fields=tooltip_fields, aliases=tooltip_aliases) if tooltip_fields else None,
+            name="Rivers (Water Alert)",
+        ).add_to(river_fg)
+
+    if not stations_map.empty:
+        cluster = MarkerCluster(
+            options={"maxClusterRadius": 40, "disableClusteringAtZoom": 11}
+        ).add_to(station_fg)
+        print(f"✓ Rendering {len(stations_map)} gauge stations")
+        southern_sample = stations_map[stations_map["district"].isin(["Chattogram", "Cox's Bazar", "Feni", "Chandpur"])][["name", "district", "lat", "lon"]].head(3)
+        if not southern_sample.empty:
+            print("  Sample southern stations:")
+            for _, s in southern_sample.iterrows():
+                print(f"    - {s['name']} ({s['district']}) @ ({s['lat']:.2f}, {s['lon']:.2f})")
+        
+
+        for _, row in stations_map.iterrows():
+            if pd.isna(row.get("lat")) or pd.isna(row.get("lon")):
+                continue
+
+            level = int(row.get("station_alert_level", WATERLEVEL_ALERT["none"]))
+            color = WATERLEVEL_ALERT_COLORS.get(level, WATERLEVEL_ALERT_COLORS[int(WATERLEVEL_ALERT["none"])])
+
+            wl = row.get("waterlevel")
+            dl = row.get("dangerlevel")
+            wl_txt = f"{float(wl):.2f}" if pd.notna(wl) else "N/A"
+            dl_txt = f"{float(dl):.2f}" if pd.notna(dl) else "N/A"
+            date_txt = row.get("wl_date")
+            if pd.notna(date_txt):
+                date_txt = str(pd.to_datetime(date_txt, errors="coerce"))
+
+            popup = (
+                f"<b>{row.get('name', 'Unknown Station')}</b><br>"
+                f"River: {row.get('river', 'N/A')}<br>"
+                f"District: {row.get('district', 'N/A')}<br>"
+                f"Water Level: {wl_txt} m<br>"
+                f"Danger Level: {dl_txt} m<br>"
+                f"Status: <b>{row.get('station_alert_label', 'No Alert')}</b><br>"
+                f"Observed: {date_txt if pd.notna(date_txt) else 'N/A'}"
+            )
+
+            folium.CircleMarker(
+                location=[float(row["lat"]), float(row["lon"])],
+                radius=6,
+                color="#222",
+                weight=1,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.9,
+                tooltip=f"{row.get('name', 'Station')} — {row.get('station_alert_label', 'No Alert')}",
+                popup=folium.Popup(popup, max_width=270),
+            ).add_to(cluster)
+
+    river_fg.add_to(m)
+    station_fg.add_to(m)
+    return river_fg, station_fg

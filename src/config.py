@@ -7,6 +7,7 @@
 DATA_PATHS = {
     "boundaries":  "../data/bangladesh_district.json",
     "flood":       "../data/flood/bgd_nhr_floods_sparsso.shp",
+    "rivers":      "../data/rivers/hotosm_bgd_waterways_polygons_shp.shp",
     "population":  "../data/population/bgd_admpop_adm2_2022.csv",
     "hospitals":   "../data/osm_hospitals.csv",
     "clinics":     "../data/osm_clinics.csv",
@@ -80,4 +81,42 @@ INFRA_MARKER_COLORS = {
     "hospital": "#e53935",
     "clinic":   "#1a73e8",
     "school":   "#2e7d32",
+}
+
+# -----------------------
+# Real-time Water Level (FFWC) Settings
+# -----------------------
+FFWC_CONFIG = {
+    "api_url": "https://api.ffwc.gov.bd/data_load/observed/",
+    "timeout_sec": 30,
+}
+
+# District-level alerting from station water level observations:
+# warning: station water level >= danger level
+# watch: station water level within X meters below danger level
+WATERLEVEL_ALERT = {
+    "watch_buffer_m": 1.00,
+    "warning_exceedance_m": 0.00,
+    "none": 0,
+    "watch": 1,
+    "warning": 2,
+}
+
+WATERLEVEL_ALERT_COLORS = {
+    2: "#b71c1c",  # Warning
+    1: "#f57c00",  # Watch
+    0: "#1e88e5",  # No Alert / normal water condition
+}
+
+WATERLEVEL_UI_COLORS = {
+    "river_default": "#1e88e5",
+    "river_stroke": "#0d47a1",
+}
+
+# River rendering guardrails (keeps Folium HTML lightweight and browser-loadable)
+RIVER_DATA_CONFIG = {
+    "bbox": (88.0, 20.4, 92.9, 26.8),
+    "max_features": 5000,
+    "simplify_tolerance_small": 0.0002,
+    "simplify_tolerance_large": 0.0015,
 }
