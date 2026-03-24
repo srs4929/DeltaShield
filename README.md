@@ -2,6 +2,7 @@
 
 ## Overview
 
+
 **DeltaShield** is a geospatial platform that helps visualize, assess, and predict disaster risk across Bangladesh. It combines flood hazards, population data, and critical infrastructure (hospitals, clinics, schools) to calculate risk scores for districts and thanas. Users can explore interactive maps, see which areas are most at risk, and make informed decisions to prepare for disasters. DeltaShield also uses machine learning to predict which districts may face problems in the future, helping authorities and planners take action before disasters happen.
 
 ### Key Features
@@ -27,13 +28,11 @@
 | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | <img width="1366" height="645" alt="Image" src="https://github.com/user-attachments/assets/f236f61b-57bd-415e-be3a-1cac0e407d0e" /> | <img width="1358" height="657" alt="Image" src="https://github.com/user-attachments/assets/59c212e1-3bbc-44f1-a37d-7896df0f7ab3" /> |
 
-| River Water Level Alerts                           | (Reserved for your next image)               |
-| -------------------------------------------------- | -------------------------------------------- |
-| _Add your River Water Level Alert screenshot here_ | _Add your second screenshot here (optional)_ |
+| River Water Level Alerts                           |
+| -------------------------------------------------- | 
+| <img width="1907" height="838" alt="Screenshot 2026-03-24 204712" src="https://github.com/user-attachments/assets/47127ff6-6791-40d9-8a30-86fda8771b65" /> | 
 
-<!-- Replace the row above with image tags when ready, e.g.:
-| <img width="1366" height="645" alt="River Water Level Alert" src="YOUR_IMAGE_URL" /> | <img width="1366" height="645" alt="Optional second image" src="YOUR_IMAGE_URL" /> |
--->
+
 
 ## Project Structure
 
