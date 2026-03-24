@@ -201,7 +201,7 @@ def _water_panel(bangladesh) -> str:
         "top5-water-panel",
         "#1565c0",
         "🌊",
-        "Top 5 Water Alert Districts",
+        "Top 5 River Water Level Alert",
         "API: FFWC observed gauge levels",
         rows,
     )
@@ -270,7 +270,7 @@ def _water_legend() -> str:
     watch_buffer = float(WATERLEVEL_ALERT.get("watch_buffer_m", 0.5))
     return make_legend(
         "water-legend",
-        "Water Alerts",
+        "River Water Level Alerts",
         "Based on gauge water level vs danger level",
         [
             (WATERLEVEL_ALERT_COLORS[2], "Warning (WL ≥ Danger Level)"),
@@ -331,7 +331,7 @@ def radio_toggle_js(flood_var, pop_var, comb_dist_var, comb_thana_var,
     <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
         <input type="radio" name="mapMode" id="waterMode"
                style="accent-color:#1565c0;width:14px;height:14px;">
-        <span id="lbl-water" style="color:#999;">Water Alerts</span>
+        <span id="lbl-water" style="color:#999;">River Alerts</span>
     </label>
 </div>
 

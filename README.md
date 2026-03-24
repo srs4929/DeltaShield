@@ -11,6 +11,7 @@
 - **Infrastructure Awareness**: Identifies and maps critical facilities (hospitals, clinics, schools) to assess resource accessibility
 - **Spatial Analytics**: Employs advanced geospatial operations (spatial joins, choropleth classification) for risk quantification
 - **Predictive Risk Analysis**: Uses machine learning to forecast district-level vulnerability, helping authorities anticipate future impacts.
+- **River Water Level Alert (FFWC API)**: Adds near-real-time river gauge monitoring with Watch/Warning/No Alert status for stations and river segments
 - **Customizable Visualization**: Tiered risk colorization with configurable thresholds and layer controls
 - **Data-Driven Insights**: UI panels displaying aggregated statistics and risk breakdowns by category
 
@@ -25,6 +26,14 @@
 | Flood + Population                                                                                                                  | Flood + Population + Infrastructure                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | <img width="1366" height="645" alt="Image" src="https://github.com/user-attachments/assets/f236f61b-57bd-415e-be3a-1cac0e407d0e" /> | <img width="1358" height="657" alt="Image" src="https://github.com/user-attachments/assets/59c212e1-3bbc-44f1-a37d-7896df0f7ab3" /> |
+
+| River Water Level Alerts                           | (Reserved for your next image)               |
+| -------------------------------------------------- | -------------------------------------------- |
+| _Add your River Water Level Alert screenshot here_ | _Add your second screenshot here (optional)_ |
+
+<!-- Replace the row above with image tags when ready, e.g.:
+| <img width="1366" height="645" alt="River Water Level Alert" src="YOUR_IMAGE_URL" /> | <img width="1366" height="645" alt="Optional second image" src="YOUR_IMAGE_URL" /> |
+-->
 
 ## Project Structure
 
@@ -199,14 +208,16 @@ The model also highlights the most influential factor for each district, improvi
 
 ## Data Sources
 
-| Dataset          | Source                                 | Format           | Description                            |
-| ---------------- | -------------------------------------- | ---------------- | -------------------------------------- |
-| **Boundaries**   | bangladesh_district.json               | GeoJSON          | 64 district administrative boundaries  |
-| **Flood Hazard** | National Flood Hazard Risk (NFHR)      | Shapefile (.shp) | Thana-level flood risk categories      |
-| **Population**   | Bangladesh Bureau of Statistics (2022) | CSV              | District population estimates          |
-| **Hospitals**    | OpenStreetMap (curated)                | CSV              | Hospital facility locations & metadata |
-| **Clinics**      | OpenStreetMap (curated)                | CSV              | Clinic facility locations & metadata   |
-| **Schools**      | OpenStreetMap (curated)                | CSV              | Educational institution locations      |
+| Dataset          | Source                                                   | Format           | Description                             |
+| ---------------- | -------------------------------------------------------- | ---------------- | --------------------------------------- |
+| **Boundaries**   | bangladesh_district.json                                 | GeoJSON          | 64 district administrative boundaries   |
+| **Flood Hazard** | National Flood Hazard Risk (NFHR)                        | Shapefile (.shp) | Thana-level flood risk categories       |
+| **Rivers**       | HOTOSM Bangladesh waterways                              | Shapefile (.shp) | River network geometry for water alerts |
+| **Population**   | Bangladesh Bureau of Statistics (2022)                   | CSV              | District population estimates           |
+| **Hospitals**    | OpenStreetMap (curated)                                  | CSV              | Hospital facility locations & metadata  |
+| **Clinics**      | OpenStreetMap (curated)                                  | CSV              | Clinic facility locations & metadata    |
+| **Schools**      | OpenStreetMap (curated)                                  | CSV              | Educational institution locations       |
+| **Water Levels** | FFWC (Bangladesh Flood Forecasting & Warning Centre) API | JSON API         | Near-real-time gauge station readings   |
 
 ---
 
@@ -254,6 +265,8 @@ The model also highlights the most influential factor for each district, improvi
 - `load_boundaries()` → GeoDataFrame of district boundaries
 - `load_population()` → DataFrame of population statistics
 - `load_flood_data()` → GeoDataFrame of flood hazard polygons
+- `load_rivers_data()` → GeoDataFrame of river geometries used in Water Alert mode
+- `load_waterlevel_data()` → Near-real-time FFWC station observations (water level vs danger level)
 - `load_infrastructure()` → Tuple of (hospitals, clinics, schools) GeoDataFrames
 - `merge_population()` → Enriches boundaries with population data
 - `slim_for_map()` → Optimizes data for web visualization
@@ -273,6 +286,7 @@ The model also highlights the most influential factor for each district, improvi
 - `add_infrastructure_scores()` → Counts facilities and calculates resource gaps
 - `add_combined_scores()` → Merges flood + population scores
 - `add_final_scores()` → Incorporates infrastructure factors
+- `add_waterlevel_alerts()` → Computes district alert status from gauge station exceedance
 - `percentile_tier()` → Assigns risk tiers (1–4) based on percentile ranking
 
 **Normalization**: All scores normalized to [0, 10] scale for comparability.
@@ -319,6 +333,7 @@ The model also highlights the most influential factor for each district, improvi
 3. **Population Layer**: District population density choropleth
 4. **Combined Risk Layer**: Multi-factor risk score choropleth (risk tiers)
 5. **Infrastructure Markers**: Cluster-based markers for hospitals, clinics, schools
+6. **Water Alerts Layer**: River segments and gauge stations styled by live Watch/Warning/No Alert status
 
 **Features**:
 
