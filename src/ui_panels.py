@@ -433,6 +433,56 @@ document.getElementById('finalMode').addEventListener('change',
     function() {{ if(this.checked) applyMode('final'); }});
 document.getElementById('waterMode').addEventListener('change',
     function() {{ if(this.checked) applyMode('water'); }});
+
+function addTop5CloseButtons() {{
+    var top5PanelIds = [
+        'top5-flood-panel',
+        'top5-pop-panel',
+        'top5-combined-panel',
+        'top5-final-panel',
+        'top5-water-panel',
+        'top5-prediction-panel'
+    ];
+
+    top5PanelIds.forEach(function(panelId) {{
+        var panel = document.getElementById(panelId);
+        if (!panel || panel.querySelector('[data-top5-close="true"]')) return;
+
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.setAttribute('data-top5-close', 'true');
+        closeBtn.setAttribute('aria-label', 'Close panel');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.style.cssText = [
+            'position:absolute',
+            'top:6px',
+            'right:8px',
+            'width:22px',
+            'height:22px',
+            'border:1px solid #ddd',
+            'border-radius:50%',
+            'background:#fff',
+            'color:#666',
+            'font-size:16px',
+            'line-height:18px',
+            'cursor:pointer',
+            'padding:0',
+            'z-index:1'
+        ].join(';');
+
+        closeBtn.addEventListener('click', function(event) {{
+            event.preventDefault();
+            event.stopPropagation();
+            panel.style.display = 'none';
+        }});
+
+        panel.style.paddingRight = '34px';
+        panel.appendChild(closeBtn);
+    }});
+}}
+
+window.addTop5CloseButtons = addTop5CloseButtons;
+addTop5CloseButtons();
 </script>"""
 
 
@@ -570,6 +620,10 @@ def add_prediction_ui(m: folium.Map, bangladesh, pred_fg, model,
 (function() {{
     var PRED_VAR = "{pred_var}";
 
+    if (typeof window.addTop5CloseButtons === 'function') {{
+        window.addTop5CloseButtons();
+    }}
+
     // Add Prediction radio button to the toggle bar
     var bar = document.querySelector('div[style*="transform:translateX(-50%)"]');
     if (bar) {{
@@ -665,6 +719,10 @@ def add_prediction_ui(m: folium.Map, bangladesh, pred_fg, model,
             var lbl = document.getElementById('lbl-pred');
             if (lbl) {{ lbl.style.color = '#999'; lbl.style.fontWeight = '400'; }}
         }};
+    }}
+
+    if (typeof window.addTop5CloseButtons === 'function') {{
+        window.addTop5CloseButtons();
     }}
 }})();
 </script>"""

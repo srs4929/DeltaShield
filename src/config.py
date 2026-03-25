@@ -1,18 +1,22 @@
 # config.py
 # All constants, paths, weights, and color maps for the disaster map project.
 
+from pathlib import Path
+
 
 # Data Paths
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 DATA_PATHS = {
-    "boundaries":  "../data/bangladesh_district.json",
-    "flood":       "../data/flood/bgd_nhr_floods_sparsso.shp",
-    "rivers":      "../data/rivers/hotosm_bgd_waterways_polygons_shp.shp",
-    "population":  "../data/population/bgd_admpop_adm2_2022.csv",
-    "hospitals":   "../data/osm_hospitals.csv",
-    "clinics":     "../data/osm_clinics.csv",
-    "schools":     "../data/osm_schools.csv",
-    "output":      "../output/disaster_map.html",
+    "boundaries":  str(PROJECT_ROOT / "data" / "bangladesh_district.json"),
+    "flood":       str(PROJECT_ROOT / "data" / "flood" / "bgd_nhr_floods_sparsso.shp"),
+    "rivers":      str(PROJECT_ROOT / "data" / "rivers" / "hotosm_bgd_waterways_polygons_shp.shp"),
+    "population":  str(PROJECT_ROOT / "data" / "population" / "bgd_admpop_adm2_2022.csv"),
+    "hospitals":   str(PROJECT_ROOT / "data" / "osm_hospitals.csv"),
+    "clinics":     str(PROJECT_ROOT / "data" / "osm_clinics.csv"),
+    "schools":     str(PROJECT_ROOT / "data" / "osm_schools.csv"),
+    "output":      str(PROJECT_ROOT / "output" / "disaster_map.html"),
 }
 
 # Map Settings
