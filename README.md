@@ -20,17 +20,20 @@
 
 ### Map Layers Preview
 
-| Flood                                                                                                                               | Population                                                                                                                          |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| <img width="1358" height="631" alt="Image" src="https://github.com/user-attachments/assets/d247e9ec-eb08-48b5-bf74-21213dfaa320" /> | <img width="1366" height="646" alt="Image" src="https://github.com/user-attachments/assets/9002b18b-2ec6-4a7a-98dd-03b4c984678e" /> |
+#### Flood
+<img alt="Flood layer preview" src="screenshots/flood.png" />
 
-| Flood + Population                                                                                                                  | Flood + Population + Infrastructure                                                                                                 |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| <img width="1366" height="645" alt="Image" src="https://github.com/user-attachments/assets/f236f61b-57bd-415e-be3a-1cac0e407d0e" /> | <img width="1358" height="657" alt="Image" src="https://github.com/user-attachments/assets/59c212e1-3bbc-44f1-a37d-7896df0f7ab3" /> |
+#### Population
+<img alt="Population layer preview" src="screenshots/population.png" />
 
-| River Water Level Alerts                           |
-| -------------------------------------------------- | 
-| <img width="1907" height="838" alt="Screenshot 2026-03-24 204712" src="https://github.com/user-attachments/assets/47127ff6-6791-40d9-8a30-86fda8771b65" /> | 
+#### Flood + Population
+<img alt="Flood and population combined layer preview" src="screenshots/Flood%20%2B%20Population.png" />
+
+#### Flood + Population + Infrastructure
+<img alt="Flood, population, and infrastructure combined layer preview" src="screenshots/Flood%20%2B%20Population%20%2B%20Infrastructure.png" />
+
+#### River Water Level Alerts
+<img alt="River water level alerts preview" src="https://github.com/user-attachments/assets/47127ff6-6791-40d9-8a30-86fda8771b65" />
 
 
 
